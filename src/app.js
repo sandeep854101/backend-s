@@ -9,6 +9,7 @@ import commentRouter from './routes/commentRoutes.js'
 import playlistRouter from './routes/playlistRoutes.js';
 import likeDislikeRouter from './routes/likeDislikeNoteRoutes.js';
 import emailRouter from './routes/mailRoutes.js';
+import fileUploadRouter from './routes/fileUpload.route.js'
 const app = express();
 dotenv.config()
 // Middleware
@@ -22,6 +23,7 @@ app.use("/api/comment", commentRouter);
 app.use("/api/playlist", playlistRouter);
 app.use("/api/like-dislike", likeDislikeRouter);
 app.use("/api/email", emailRouter);
+app.use("/api/upload",fileUploadRouter)
 
 // Database Connection
 connectDB();

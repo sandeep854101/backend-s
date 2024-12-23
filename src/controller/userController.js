@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from "crypto";
+import mongoose from "mongoose";
 import { User } from '../model/User.js';
 import sendEmail from "../utils/sendEmail.js";
 
@@ -47,6 +48,12 @@ export const registerUser = async (req, res) => {
       });
     }
 
+    // Check MongoDB connection status
+    if (mongoose.connection.readyState !== 1) {
+      console.error("MongoDB connection not established");
+      return res.status(500).json({ error: "Database connection error. Please try again later." });
+    }
+
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -57,7 +64,7 @@ export const registerUser = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Generate OTP (6 digits)
-    const otp = Math.floor(100000 + Math.random() * 900000); 
+    const otp = Math.floor(100000 + Math.random() * 900000);
 
     // Set OTP expiration time (e.g., 10 minutes from now)
     const otpExpiration = new Date();
@@ -90,6 +97,11 @@ export const registerUser = async (req, res) => {
       message: "User registered successfully. Please verify your email with the OTP sent.",
     });
   } catch (err) {
+    if (err.name === "MongoNetworkError") {
+      console.error("MongoDB connection error:", err.message);
+      return res.status(500).json({ error: "Database connection error. Please check your network and try again." });
+    }
+
     console.error("Error during user registration:", err.message);
     res.status(500).json({ error: "Internal server error" });
   }

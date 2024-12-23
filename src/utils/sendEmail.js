@@ -69,7 +69,7 @@ const sendEmail = async (email) => {
 
     // Email content
     const mailOptions = {
-      from: `"Your App Name" <${process.env.EMAIL_USER}>`, // Sender's name and email
+      from: `"StudyPulse" <${process.env.EMAIL_USER}>`, // Sender's name and email
       to: email,
       subject: "Email OTP Verification",
       html: Verification_Email_Template(otp), // Use your email template

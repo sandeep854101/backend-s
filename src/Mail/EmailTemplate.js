@@ -1,4 +1,4 @@
-export const Verification_Email_Template=(otp) => `
+export const Verification_Email_Template = (otp) => `
   <!DOCTYPE html>
   <html lang="en">
   <head>
@@ -62,17 +62,28 @@ export const Verification_Email_Template=(otp) => `
   </head>
   <body>
       <div class="container">
-          <div class="header">Verify Your Email</div>
-          <div class="content">
-              <p>Hello,</p>
-              <p>Thank you for signing up! Please confirm your email address by entering the code below:</p>
-              <span class="verification-code">${otp}</span>
-              <p>If you did not create an account, no further action is required. If you have any questions, feel free to contact our support team.</p>
-          </div>
-          <div class="footer">
-              <p>&copy; ${new Date().getFullYear()} Your Company. All rights reserved.</p>
-          </div>
-      </div>
+    <div class="header">🎉 Verify Your Email 🎉</div>
+    <div class="content">
+        <p>Hello there,</p>
+        <p>
+            We're so excited to have you join us! To make sure it's really you, please take a moment to confirm your email address by entering the code below:
+        </p>
+        <span class="verification-code">${otp}</span>
+        <p>
+            This step helps us ensure a safe and secure experience for everyone. If you didn’t sign up, no worries—just ignore this message.
+        </p>
+        <p>
+            Got questions or need help? Our friendly support team is just a click away!
+        </p>
+    </div>
+    <div class="footer">
+        <p>
+            💖 Thank you for choosing us! <br />
+            &copy; ${new Date().getFullYear()} Your Company. All rights reserved.
+        </p>
+    </div>
+</div>
+
   </body>
   </html>
 `;
@@ -173,4 +184,3 @@ export const Verification_Email_Template=(otp) => `
 //     </html>
 //     `;
 //   };
-  

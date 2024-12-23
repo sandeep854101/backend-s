@@ -5,84 +5,98 @@ import mongoose from "mongoose";
 import { User } from '../model/User.js';
 import sendEmail from "../utils/sendEmail.js";
 
-// user resister
+// Generate Access and Refresh Tokens
+export const generateAccessAndRefreshTokens = async (userId) => {
+  try {
+    const user = await User.findById(userId);
+
+    if (!user) {
+      throw new Error("User not found during token generation");
+    }
+
+    const accessToken = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET || "defaultAccessTokenSecret",
+      { expiresIn: "15m" }
+    );
+
+    const refreshToken = jwt.sign(
+      { id: user._id },
+      process.env.REFRESH_TOKEN_SECRET || "defaultRefreshTokenSecret",
+      { expiresIn: "7d" }
+    );
+
+    user.refreshToken = refreshToken;
+    await user.save({ validateBeforeSave: false });
+
+    return { accessToken, refreshToken };
+  } catch (error) {
+    console.error("Error generating tokens:", error);
+    throw new Error("Error generating tokens");
+  }
+};
+
+// Register User
 export const registerUser = async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
-    // Validate username
+    // Validation
     if (!username || username.trim().length < 3 || username.trim().length > 50) {
       return res.status(400).json({ message: "Username must be between 3 and 50 characters" });
     }
 
-    // Validate email
     const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
     if (!email || !emailRegex.test(email)) {
       return res.status(400).json({ message: "Invalid email address" });
     }
 
-    // Validate password
     if (!password || password.length < 8 || password.length > 100) {
-      return res.status(400).json({
-        message: "Password must be between 8 and 100 characters long",
-      });
+      return res.status(400).json({ message: "Password must be between 8 and 100 characters long" });
     }
-    if (!/[A-Z]/.test(password)) {
-      return res.status(400).json({
-        message: "Password must contain at least one uppercase letter",
-      });
-    }
-    if (!/[a-z]/.test(password)) {
-      return res.status(400).json({
-        message: "Password must contain at least one lowercase letter",
-      });
-    }
-    if (!/[0-9]/.test(password)) {
-      return res.status(400).json({
-        message: "Password must contain at least one digit",
-      });
-    }
-    if (!/[@$!%*?&]/.test(password)) {
-      return res.status(400).json({
-        message: "Password must contain at least one special character (@$!%*?&)",
-      });
+    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password) || !/[@$!%*?&]/.test(password)) {
+      return res.status(400).json({ message: "Password must contain uppercase, lowercase, digit, and special character" });
     }
 
-    // Check MongoDB connection status
     if (mongoose.connection.readyState !== 1) {
       console.error("MongoDB connection not established");
       return res.status(500).json({ error: "Database connection error. Please try again later." });
     }
 
-    // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: "Email already in use" });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Generate OTP (6 digits)
     const otp = Math.floor(100000 + Math.random() * 900000);
+    const otpExpiration = new Date(Date.now() + 10 * 60 * 1000);
 
-    // Set OTP expiration time (e.g., 10 minutes from now)
-    const otpExpiration = new Date();
-    otpExpiration.setMinutes(otpExpiration.getMinutes() + 10);
-
-    // Create new user
     const user = new User({
       username,
       email,
       password: hashedPassword,
       isVerified: false,
       emailVerificationOtp: otp,
-      otpExpiration: otpExpiration,
+      otpExpiration,
     });
 
     await user.save();
 
-    // Send OTP email
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
+
+    const option = {
+      httpOnly: true,
+      secure: true,
+      sameSite: "strict",
+    };
+
+    res.status(201)
+      .cookie("accessToken", accessToken, option)
+      .cookie("refreshToken", refreshToken, option)
+      .json({ message: "User registered successfully. Please verify your email with the OTP sent." });
+
     const emailContent = `
       <h1>Email Verification</h1>
       <p>Hi ${username},</p>
@@ -92,55 +106,43 @@ export const registerUser = async (req, res) => {
     `;
 
     await sendEmail(email, "Verify Your Email", emailContent);
-
-    res.status(201).json({
-      message: "User registered successfully. Please verify your email with the OTP sent.",
-    });
   } catch (err) {
-    if (err.name === "MongoNetworkError") {
-      console.error("MongoDB connection error:", err.message);
-      return res.status(500).json({ error: "Database connection error. Please check your network and try again." });
-    }
-
     console.error("Error during user registration:", err.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };
 
-
-// Login a user
+// Login User
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validate input
     if (!email || !password) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Compare passwords
     const isPasswordMatch = await bcrypt.compare(password, user.password);
     if (!isPasswordMatch) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    // Generate JWT token
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || "FDLHF3123KSDFJDSFKF", { expiresIn: "1d" });
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
 
-    res.status(200).json({
-      token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-      },
-    });
+    const option = {
+      httpOnly: true,
+      secure: true,
+      sameSite: "strict",
+    };
+
+    res.status(200)
+      .cookie("accessToken", accessToken, option)
+      .cookie("refreshToken", refreshToken, option)
+      .json({ message: "Login successful", user: { id: user._id, username: user.username, email: user.email } });
   } catch (err) {
     console.error("Error during user login:", err.message);
     res.status(500).json({ error: "Internal server error" });

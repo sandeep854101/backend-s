@@ -2,6 +2,7 @@ import express from 'express'
 import bodyParser from "body-parser";
 import connectDB from "./config/db.js";
 import dotenv from 'dotenv'
+import cors from "cors";
 import userRouter from "./routes/userRoutes.js";
 import channelRouter from "./routes/channelRoutes.js";
 import notesRouter from "./routes/noteRoutes.js";
@@ -14,6 +15,12 @@ const app = express();
 dotenv.config()
 // Middleware
 app.use(bodyParser.json());
+
+app.use(cors({
+    origin: "http://localhost:5173", // Replace with your frontend origin
+    methods: "GET,POST,PUT,DELETE",
+    credentials: true // If you need cookies/auth headers
+}));
 
 // Routes
 app.use("/api/users", userRouter);

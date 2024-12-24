@@ -6,20 +6,20 @@ import { User } from '../model/User.js';
 import sendEmail from '../utils/sendEmail.js';
 
 // Generate Access and Refresh Tokens
-export const generateAccessAndRefreshTokens = async(userId) =>{
+export const generateAccessAndRefreshTokens = async (userId) => {
   try {
-      const user = await User.findById(userId)
-      const accessToken = user.generateAccessToken()
-      const refreshToken = user.generateRefreshToken()
+    const user = await User.findById(userId)
+    const accessToken = user.generateAccessToken()
+    const refreshToken = user.generateRefreshToken()
 
-      user.refreshToken = refreshToken
-      await user.save({ validateBeforeSave: false })
+    user.refreshToken = refreshToken
+    await user.save({ validateBeforeSave: false })
 
-      return {accessToken, refreshToken}
+    return { accessToken, refreshToken }
 
 
   } catch (error) {
-      throw new ApiError(500, "Something went wrong while generating refresh and access token")
+    throw new ApiError(500, "Something went wrong while generating refresh and access token")
   }
 }
 
@@ -129,7 +129,11 @@ export const loginUser = async (req, res) => {
     res.status(200)
       .cookie("accessToken", accessToken, cookieOptions)
       .cookie("refreshToken", refreshToken, cookieOptions)
-      .json({ message: "Login successful", user: { id: user._id, username: user.username, email: user.email } });
+      .json({
+        message: "Login successful",
+        user: { id: user._id, username: user.username, email: user.email },
+        tokens: { accessToken, refreshToken }
+      });
   } catch (err) {
     console.error("Error during user login:", err.message);
     res.status(500).json({ error: "Internal server error" });
@@ -230,7 +234,7 @@ export const editProfile = async (req, res) => {
         <p>If you did not request this, please ignore this email.</p>
       `;
       await sendEmail(email, "Verify Your Email Address", otpMessage);
-      
+
       return res.status(200).json({
         message: "Profile updated successfully. Please verify your new email with the OTP sent.",
       });

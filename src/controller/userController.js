@@ -28,15 +28,25 @@ export const registerUser = async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
+    // Default values for profile
+    const defaultAvatarUrl = "https://static.vecteezy.com/system/resources/previews/019/879/186/non_2x/user-icon-on-transparent-background-free-png.png";
+    const defaultBio = "This is my bio";
+    const defaultSocialLinks = {
+      linkedin: "https://static.vecteezy.com/system/resources/previews/019/879/186/non_2x/user-icon-on-transparent-background-free-png.png"
+    };
+
+    // Validate username
     if (!username || username.trim().length < 3 || username.trim().length > 50) {
       return res.status(400).json({ message: "Username must be between 3 and 50 characters" });
     }
 
+    // Validate email
     const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
     if (!email || !emailRegex.test(email)) {
       return res.status(400).json({ message: "Invalid email address" });
     }
 
+    // Validate password
     if (!password || password.length < 8 || password.length > 100) {
       return res.status(400).json({ message: "Password must be between 8 and 100 characters long" });
     }
@@ -48,20 +58,26 @@ export const registerUser = async (req, res) => {
       });
     }
 
+    // Check MongoDB connection status
     if (mongoose.connection.readyState !== 1) {
       console.error("MongoDB connection not established");
       return res.status(500).json({ error: "Database connection error. Please try again later." });
     }
 
+    // Check if the email already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: "Email already in use" });
     }
 
+    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
-    const otp = Math.floor(100000 + Math.random() * 900000);
-    const otpExpiration = new Date(Date.now() + 10 * 60 * 1000);
 
+    // Generate OTP for email verification
+    const otp = Math.floor(100000 + Math.random() * 900000);
+    const otpExpiration = new Date(Date.now() + 10 * 60 * 1000); // OTP expires in 10 minutes
+
+    // Create new user object
     const user = new User({
       username,
       email,
@@ -69,9 +85,17 @@ export const registerUser = async (req, res) => {
       isVerified: false,
       emailVerificationOtp: otp,
       otpExpiration,
+      profileDetails: {
+        avatarUrl: defaultAvatarUrl,
+        bio: defaultBio,
+        socialLinks: defaultSocialLinks,
+      },
     });
 
+    // Save user to database
     await user.save();
+
+    // Generate access and refresh tokens
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
     const cookieOptions = {
       httpOnly: true,
@@ -79,11 +103,13 @@ export const registerUser = async (req, res) => {
       sameSite: "strict",
     };
 
+    // Send response with cookies and success message
     res.status(201)
       .cookie("accessToken", accessToken, cookieOptions)
       .cookie("refreshToken", refreshToken, cookieOptions)
       .json({ message: "User registered successfully. Please verify your email with the OTP sent." });
 
+    // Send email with OTP for verification
     const emailContent = `
       <h1>Email Verification</h1>
       <p>Hi ${username},</p>

@@ -77,7 +77,6 @@ const sendEmail = async (email) => {
 
     // Send email with OTP
     await transporter.sendMail(mailOptions);
-    console.log("OTP email sent successfully to:", email);
 
     // Return OTP to be saved in the database (for server-side verification)
     return otp;

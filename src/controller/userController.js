@@ -1,47 +1,33 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import crypto from "crypto";
-import mongoose from "mongoose";
+import crypto from 'crypto';
+import mongoose from 'mongoose';
 import { User } from '../model/User.js';
-import sendEmail from "../utils/sendEmail.js";
+import sendEmail from '../utils/sendEmail.js';
 
 // Generate Access and Refresh Tokens
-export const generateAccessAndRefreshTokens = async (userId) => {
+export const generateAccessAndRefreshTokens = async(userId) =>{
   try {
-    const user = await User.findById(userId);
+      const user = await User.findById(userId)
+      const accessToken = user.generateAccessToken()
+      const refreshToken = user.generateRefreshToken()
 
-    if (!user) {
-      throw new Error("User not found during token generation");
-    }
+      user.refreshToken = refreshToken
+      await user.save({ validateBeforeSave: false })
 
-    const accessToken = jwt.sign(
-      { id: user._id },
-      process.env.JWT_SECRET || "defaultAccessTokenSecret",
-      { expiresIn: "15m" }
-    );
+      return {accessToken, refreshToken}
 
-    const refreshToken = jwt.sign(
-      { id: user._id },
-      process.env.REFRESH_TOKEN_SECRET || "defaultRefreshTokenSecret",
-      { expiresIn: "7d" }
-    );
 
-    user.refreshToken = refreshToken;
-    await user.save({ validateBeforeSave: false });
-
-    return { accessToken, refreshToken };
   } catch (error) {
-    console.error("Error generating tokens:", error);
-    throw new Error("Error generating tokens");
+      throw new ApiError(500, "Something went wrong while generating refresh and access token")
   }
-};
+}
 
 // Register User
 export const registerUser = async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
-    // Validation
     if (!username || username.trim().length < 3 || username.trim().length > 50) {
       return res.status(400).json({ message: "Username must be between 3 and 50 characters" });
     }
@@ -54,8 +40,12 @@ export const registerUser = async (req, res) => {
     if (!password || password.length < 8 || password.length > 100) {
       return res.status(400).json({ message: "Password must be between 8 and 100 characters long" });
     }
-    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password) || !/[@$!%*?&]/.test(password)) {
-      return res.status(400).json({ message: "Password must contain uppercase, lowercase, digit, and special character" });
+
+    const passwordCriteria = /(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[@$!%*?&])/;
+    if (!passwordCriteria.test(password)) {
+      return res.status(400).json({
+        message: "Password must contain uppercase, lowercase, digit, and special character",
+      });
     }
 
     if (mongoose.connection.readyState !== 1) {
@@ -69,7 +59,6 @@ export const registerUser = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-
     const otp = Math.floor(100000 + Math.random() * 900000);
     const otpExpiration = new Date(Date.now() + 10 * 60 * 1000);
 
@@ -83,26 +72,24 @@ export const registerUser = async (req, res) => {
     });
 
     await user.save();
-
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
-
-    const option = {
+    const cookieOptions = {
       httpOnly: true,
       secure: true,
       sameSite: "strict",
     };
 
     res.status(201)
-      .cookie("accessToken", accessToken, option)
-      .cookie("refreshToken", refreshToken, option)
+      .cookie("accessToken", accessToken, cookieOptions)
+      .cookie("refreshToken", refreshToken, cookieOptions)
       .json({ message: "User registered successfully. Please verify your email with the OTP sent." });
 
     const emailContent = `
       <h1>Email Verification</h1>
       <p>Hi ${username},</p>
-      <p>Thank you for registering. Please use the following OTP to verify your email:</p>
+      <p>Thank you for registering. Use the OTP below to verify your email:</p>
       <h2>${otp}</h2>
-      <p>This OTP will expire in 10 minutes. If you did not register, please ignore this email.</p>
+      <p>This OTP will expire in 10 minutes. If you did not register, ignore this email.</p>
     `;
 
     await sendEmail(email, "Verify Your Email", emailContent);
@@ -133,15 +120,15 @@ export const loginUser = async (req, res) => {
 
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
 
-    const option = {
+    const cookieOptions = {
       httpOnly: true,
       secure: true,
       sameSite: "strict",
     };
 
     res.status(200)
-      .cookie("accessToken", accessToken, option)
-      .cookie("refreshToken", refreshToken, option)
+      .cookie("accessToken", accessToken, cookieOptions)
+      .cookie("refreshToken", refreshToken, cookieOptions)
       .json({ message: "Login successful", user: { id: user._id, username: user.username, email: user.email } });
   } catch (err) {
     console.error("Error during user login:", err.message);
@@ -149,24 +136,21 @@ export const loginUser = async (req, res) => {
   }
 };
 
-// resent resister user
+// Fetch Recent Registered User
 export const recentRegisteredUser = async (req, res) => {
   try {
-    // Fetch the most recent user by createdAt field
     const recentUser = await User.findOne().sort({ createdAt: -1 }).exec();
-
-    // If no user is found
     if (!recentUser) {
-      return res.status(404).json({ message: "No recent data found" });
+      return res.status(404).json({ message: "No recent user found" });
     }
-
-    // Return the recent user data
     res.status(200).json(recentUser);
   } catch (error) {
-    console.error("Error fetching recent data:", error);
-    res.status(500).json({ message: "Error fetching recent data", error });
+    console.error("Error fetching recent user:", error);
+    res.status(500).json({ error: "Error fetching recent user" });
   }
 };
+
+
 
 // edit profile 
 

@@ -33,10 +33,9 @@ export const verifyEmail = async (req, res) => {
     }
 
     // If the token is valid, mark the email as verified
-    user.isVerified = true;
-
+     user.isVerified = true;
     // Clear the verification token after successful verification
-    user.emailVerificationOtp = undefined;
+     user.emailVerificationOtp = undefined;
 
     // Save the updated user document
     await user.save();

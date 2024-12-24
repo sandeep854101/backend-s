@@ -47,28 +47,47 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Utility function to generate tokens
+const generateToken = (payload, secret, options) => {
+  if (!secret) {
+    throw new Error("JWT Secret is not defined");
+  }
+  return jwt.sign(payload, secret, options);
+};
+
 // Method to generate Access Token
-userSchema.methods.generateAccessToken = function () {
-  return jwt.sign(
-    {
+userSchema.methods.generateAccessToken = function (additionalClaims = {}) {
+  try {
+    const payload = {
       _id: this._id,
       email: this.email,
       username: this.username,
-    },
-    process.env.ACCESS_TOKEN_SECRET || "defaultAccessTokenSecret",
-    { expiresIn: process.env.ACCESS_TOKEN_EXPIRY || "15m" }
-  );
+      ...additionalClaims,
+    };
+
+    const secret = process.env.ACCESS_TOKEN_SECRET;
+    const options = { expiresIn: process.env.ACCESS_TOKEN_EXPIRY || "15m" };
+
+    return generateToken(payload, secret, options);
+  } catch (error) {
+    console.error("Error generating access token:", error);
+    throw new Error("Failed to generate access token");
+  }
 };
 
 // Method to generate Refresh Token
 userSchema.methods.generateRefreshToken = function () {
-  return jwt.sign(
-    {
-      _id: this._id,
-    },
-    process.env.REFRESH_TOKEN_SECRET || "defaultRefreshTokenSecret",
-    { expiresIn: process.env.REFRESH_TOKEN_EXPIRY || "7d" }
-  );
+  try {
+    const payload = { _id: this._id };
+
+    const secret = process.env.REFRESH_TOKEN_SECRET;
+    const options = { expiresIn: process.env.REFRESH_TOKEN_EXPIRY || "7d" };
+
+    return generateToken(payload, secret, options);
+  } catch (error) {
+    console.error("Error generating refresh token:", error);
+    throw new Error("Failed to generate refresh token");
+  }
 };
 
 export const User = mongoose.model("User", userSchema);

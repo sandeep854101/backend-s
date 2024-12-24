@@ -185,8 +185,10 @@ export const recentRegisteredUser = async (req, res) => {
 // edit profile 
 
 export const editProfile = async (req, res) => {
+  
   try {
-    const userId = req.user.id;
+    const userId = req.user._id;
+    
     const { username, email, avatarUrl, bio, socialLinks, otp } = req.body;
 
     // Validate input fields

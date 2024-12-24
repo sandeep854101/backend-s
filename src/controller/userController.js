@@ -267,7 +267,7 @@ export const editProfile = async (req, res) => {
 // user details based on their id
 export const userDetails = async (req, res) => {
   const { id } = req.params;
-
+console.log(id)
   try {
 
     const user = await User.findById(id);
